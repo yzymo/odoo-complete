@@ -4,14 +4,35 @@ Application fullstack pour extraire des informations produits à partir de docum
 
 **Version actuelle** : Phase 1 MVP (v1.0.0)
 
-## 🎯 Fonctionnalités MVP (Phase 1)
+## 🎯 Fonctionnalités Implémentées (Phase 1+)
 
+### Extraction & Traitement
 ✅ **Extraction PDF** : Upload et extraction de texte depuis des fichiers PDF
-✅ **AI-powered Structuring** : Utilisation d'OpenAI GPT-3.5 pour structurer les données produits
-✅ **Stockage MongoDB Atlas** : Base de données cloud avec schéma complet Odoo
+✅ **Extraction par Dossier** : Traitement récursif de dossiers complets avec support chemins longs Windows (>260 chars)
+✅ **Détection Langue** : Filtrage automatique pour ne traiter que les documents français
+✅ **Chunking Intelligent** : Traitement des PDFs volumineux (>20k caractères) par chunks avec overlap
+
+### Intelligence Artificielle
+✅ **AI-powered Structuring** : Utilisation d'OpenAI GPT-3.5/GPT-4 pour structurer les données produits
+✅ **Scores de Confiance** : Score de confiance par champ extrait (0-1)
+✅ **Gestion Doublons** : Détection et enrichissement automatique des produits existants
+
+### Gestion des Images
+✅ **Traitement Images** : Scan automatique des images JPG/PNG dans le dossier source
+✅ **Extraction Référence** : Extraction intelligente de la référence produit depuis le nom de fichier
+✅ **Variantes Multi-Tailles** : Génération automatique de 4 tailles (256, 512, 1024, 1920 px)
+✅ **Association Automatique** : Matching images ↔ produits via default_code/barcode/Code_EAN
+
+### Export & Stockage
+✅ **Stockage MongoDB Atlas** : Base de données cloud avec schéma complet Odoo (34 champs)
+✅ **Export Excel** : Export complet avec tous les champs Odoo + métadonnées
+✅ **Template Excel** : Modèle vide téléchargeable pour saisie manuelle
+
+### Interface Utilisateur
 ✅ **Interface React** : Navigation, recherche, filtres et pagination
 ✅ **Validation Workflow** : Workflow de validation manuel avant export
 ✅ **API REST** : Documentation interactive avec FastAPI
+✅ **Statistiques** : Stats par statut, images, sources
 
 ## 📋 Prérequis
 
@@ -164,10 +185,24 @@ Ouvrir votre navigateur : **http://localhost:5173**
 Accéder à la documentation interactive : **http://localhost:8000/api/docs**
 
 Exemples d'endpoints :
-- `GET /api/v1/products` - Liste des produits
+
+**Produits**
+- `GET /api/v1/products` - Liste des produits (pagination, filtres, recherche)
 - `GET /api/v1/products/{id}` - Détail d'un produit
-- `POST /api/v1/extraction/extract-file` - Upload et extraction
+- `PATCH /api/v1/products/{id}` - Modifier un produit
 - `PATCH /api/v1/products/{id}/validate` - Valider un produit
+
+**Extraction**
+- `POST /api/v1/extraction/extract-file` - Upload et extraction d'un PDF
+- `POST /api/v1/extraction/extract-directory` - Extraction d'un dossier complet
+
+**Images**
+- `GET /api/v1/images/{size}/{filename}` - Récupérer une image produit
+
+**Export**
+- `GET /api/v1/export/excel` - Exporter tous les produits en Excel
+- `GET /api/v1/export/excel/template` - Télécharger template Excel vide
+- `GET /api/v1/export/stats` - Statistiques d'export
 
 ## 📊 Schéma MongoDB
 
