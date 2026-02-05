@@ -32,6 +32,7 @@ async def get_products(
     limit: int = Query(50, ge=1, le=200),
     status: Optional[str] = Query(None, description="Filter by extraction status"),
     search: Optional[str] = Query(None, description="Full-text search"),
+    source_type: Optional[str] = Query(None, description="Filter by source type (pdf, directory, web)"),
     storage_service: StorageService = Depends(get_storage_service)
 ):
     """
@@ -41,15 +42,23 @@ async def get_products(
     - **limit**: Number of products per page
     - **status**: Filter by extraction status (raw, validated, exported)
     - **search**: Full-text search on name and description
+    - **source_type**: Filter by source type (pdf, directory, web)
     """
     try:
         skip = (page - 1) * limit
 
+        # Build filter criteria
+        filters = {}
+        if status:
+            filters["status"] = status
+        if source_type:
+            filters["source_type"] = source_type
+
         # Apply filters
         if search:
-            products, total = await storage_service.search_products(search, skip, limit)
-        elif status:
-            products, total = await storage_service.get_products_by_status(status, skip, limit)
+            products, total = await storage_service.search_products(search, skip, limit, filters)
+        elif filters:
+            products, total = await storage_service.get_products_with_filters(filters, skip, limit)
         else:
             products, total = await storage_service.get_products(skip, limit)
 
@@ -65,6 +74,60 @@ async def get_products(
 
     except Exception as e:
         logger.error(f"Error getting products: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving products: {str(e)}")
+
+
+@router.get("/duplicates/by-code")
+async def get_duplicates_by_code(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    min_count: int = Query(2, ge=2, description="Minimum products per group"),
+    storage_service: StorageService = Depends(get_storage_service)
+):
+    """
+    Get products grouped by default_code to identify duplicates.
+
+    Returns groups of products that share the same default_code.
+    Only returns groups with at least `min_count` products.
+    """
+    try:
+        skip = (page - 1) * limit
+        groups, total = await storage_service.get_duplicates_by_code(skip, limit, min_count)
+
+        pages = math.ceil(total / limit) if total > 0 else 0
+
+        return {
+            "groups": groups,
+            "total_groups": total,
+            "page": page,
+            "limit": limit,
+            "pages": pages
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting duplicates by code: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving duplicates: {str(e)}")
+
+
+@router.get("/duplicates/by-code/{default_code}")
+async def get_products_by_code(
+    default_code: str,
+    storage_service: StorageService = Depends(get_storage_service)
+):
+    """
+    Get all products with a specific default_code.
+    """
+    try:
+        products = await storage_service.get_products_by_default_code(default_code)
+
+        return {
+            "default_code": default_code,
+            "count": len(products),
+            "products": products
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting products by code {default_code}: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving products: {str(e)}")
 
 

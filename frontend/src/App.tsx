@@ -5,11 +5,13 @@
 import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
-import { Package, Upload, Home } from 'lucide-react';
+import { Package, Upload, Home, Copy, Server } from 'lucide-react';
 
 import ExtractionPage from './pages/ExtractionPage';
 import ProductsPage from './pages/ProductsPage';
 import ProductDetailPage from './pages/ProductDetailPage';
+import DuplicatesPage from './pages/DuplicatesPage';
+import OdooProductsPage from './pages/OdooProductsPage';
 
 // Create QueryClient instance
 const queryClient = new QueryClient({
@@ -41,6 +43,8 @@ function App() {
                   <NavLink to="/" icon={<Home />} label="Home" />
                   <NavLink to="/extract" icon={<Upload />} label="Extract" />
                   <NavLink to="/products" icon={<Package />} label="Products" />
+                  <NavLink to="/duplicates" icon={<Copy />} label="Duplicates" />
+                  <NavLink to="/odoo" icon={<Server />} label="Odoo" />
                 </div>
               </div>
             </div>
@@ -53,6 +57,8 @@ function App() {
               <Route path="/extract" element={<ExtractionPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/products/:id" element={<ProductDetailPage />} />
+              <Route path="/duplicates" element={<DuplicatesPage />} />
+              <Route path="/odoo" element={<OdooProductsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>

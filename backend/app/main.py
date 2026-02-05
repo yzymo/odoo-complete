@@ -5,10 +5,12 @@ Product Catalog Extraction API for Odoo e-commerce enrichment.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.database import database
-from app.api.routes import products, extraction, images, export
-from app.config import settings
+from app.api.routes import products, extraction, images, export, odoo
+from app.config import settings, get_storage_path
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +41,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for serving extracted images
+extracted_images_path = get_storage_path("extracted_images")
+if os.path.exists(extracted_images_path):
+    app.mount(
+        "/extracted_images",
+        StaticFiles(directory=extracted_images_path),
+        name="extracted_images"
+    )
+    logging.getLogger(__name__).info(f"📁 Serving static images from: {extracted_images_path}")
 
 
 @app.on_event("startup")
@@ -94,6 +106,12 @@ app.include_router(
     export.router,
     prefix="/api/v1/export",
     tags=["Export"]
+)
+
+app.include_router(
+    odoo.router,
+    prefix="/api/v1/odoo",
+    tags=["Odoo"]
 )
 
 

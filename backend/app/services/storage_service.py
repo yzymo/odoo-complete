@@ -439,21 +439,29 @@ class StorageService:
         self,
         search_text: str,
         skip: int = 0,
-        limit: int = 50
+        limit: int = 50,
+        filters: Dict[str, Any] = None
     ) -> tuple[List[Dict[str, Any]], int]:
         """
-        Full-text search on products.
+        Full-text search on products with optional additional filters.
 
         Args:
             search_text: Text to search for
             skip: Pagination skip
             limit: Max results
+            filters: Additional filters (status, source_type)
 
         Returns:
             Tuple of (products, total count)
         """
         try:
             query = {"$text": {"$search": search_text}}
+
+            # Add additional filters
+            if filters:
+                additional_query = self._build_filter_query(filters)
+                query = {"$and": [query, additional_query]}
+
             total = await self.products_collection.count_documents(query)
             cursor = self.products_collection.find(query).skip(skip).limit(limit)
             products = await cursor.to_list(length=limit)
@@ -464,6 +472,42 @@ class StorageService:
             return products, total
         except Exception as e:
             logger.error(f"Error searching products: {e}")
+            return [], 0
+
+    def _build_filter_query(self, filters: Dict[str, Any]) -> Dict[str, Any]:
+        """Build MongoDB query from filter dict."""
+        query = {}
+
+        if "status" in filters:
+            query["extraction_metadata.status"] = filters["status"]
+
+        if "source_type" in filters:
+            query["sources.source_type"] = filters["source_type"]
+
+        return query
+
+    async def get_products_with_filters(
+        self,
+        filters: Dict[str, Any],
+        skip: int = 0,
+        limit: int = 50
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """
+        Get products with multiple filters.
+
+        Args:
+            filters: Dict with filter keys (status, source_type)
+            skip: Pagination skip
+            limit: Max results
+
+        Returns:
+            Tuple of (products, total count)
+        """
+        try:
+            query = self._build_filter_query(filters)
+            return await self.get_products(skip, limit, query)
+        except Exception as e:
+            logger.error(f"Error getting products with filters: {e}")
             return [], 0
 
     async def get_products_by_status(
@@ -498,3 +542,123 @@ class StorageService:
             logger.info(f"Validated product {product_id}")
             return await self.get_product_by_id(product_id)
         return None
+
+    async def get_duplicates_by_code(
+        self,
+        skip: int = 0,
+        limit: int = 50,
+        min_count: int = 2
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """
+        Get products grouped by default_code to identify duplicates.
+
+        Uses MongoDB aggregation to group products by their default_code
+        and returns only groups with at least `min_count` products.
+
+        Args:
+            skip: Number of groups to skip
+            limit: Maximum number of groups to return
+            min_count: Minimum products per group (default 2 for duplicates)
+
+        Returns:
+            Tuple of (list of groups, total count of groups)
+        """
+        try:
+            # Aggregation pipeline to group by default_code
+            pipeline = [
+                # Match only products with non-null default_code
+                {
+                    "$match": {
+                        "default_code": {"$ne": None, "$exists": True, "$ne": ""}
+                    }
+                },
+                # Group by default_code
+                {
+                    "$group": {
+                        "_id": "$default_code",
+                        "count": {"$sum": 1},
+                        "products": {
+                            "$push": {
+                                "_id": {"$toString": "$_id"},
+                                "name": "$name",
+                                "constructeur": "$constructeur",
+                                "barcode": "$barcode",
+                                "created_at": "$created_at",
+                                "status": "$extraction_metadata.status",
+                                "source_type": {"$arrayElemAt": ["$sources.source_type", 0]},
+                                "image_count": {"$size": {"$ifNull": ["$images", []]}}
+                            }
+                        }
+                    }
+                },
+                # Filter groups with at least min_count products
+                {
+                    "$match": {
+                        "count": {"$gte": min_count}
+                    }
+                },
+                # Sort by count descending (most duplicates first)
+                {
+                    "$sort": {"count": -1}
+                }
+            ]
+
+            # Get total count first
+            count_pipeline = pipeline + [{"$count": "total"}]
+            count_result = await self.products_collection.aggregate(count_pipeline).to_list(1)
+            total = count_result[0]["total"] if count_result else 0
+
+            # Get paginated results
+            paginated_pipeline = pipeline + [
+                {"$skip": skip},
+                {"$limit": limit}
+            ]
+
+            groups = await self.products_collection.aggregate(paginated_pipeline).to_list(limit)
+
+            # Format response
+            formatted_groups = [
+                {
+                    "default_code": group["_id"],
+                    "count": group["count"],
+                    "products": group["products"]
+                }
+                for group in groups
+            ]
+
+            logger.info(f"Found {total} duplicate groups (showing {len(formatted_groups)})")
+            return formatted_groups, total
+
+        except Exception as e:
+            logger.error(f"Error getting duplicates by code: {e}")
+            return [], 0
+
+    async def get_products_by_default_code(
+        self,
+        default_code: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all products with a specific default_code.
+
+        Args:
+            default_code: The default_code to search for
+
+        Returns:
+            List of products with that default_code
+        """
+        try:
+            cursor = self.products_collection.find(
+                {"default_code": default_code}
+            ).sort("created_at", -1)
+
+            products = await cursor.to_list(length=100)
+
+            # Serialize all products
+            products = [self.serialize_product(p) for p in products]
+
+            logger.info(f"Found {len(products)} products with code {default_code}")
+            return products
+
+        except Exception as e:
+            logger.error(f"Error getting products by code {default_code}: {e}")
+            return []

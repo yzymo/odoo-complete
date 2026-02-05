@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: list = ["http://localhost:5173", "http://localhost:3000"]
 
+    # Odoo Configuration
+    odoo_url: str = ""
+    odoo_db: str = ""
+    odoo_username: str = ""
+    odoo_password: str = ""
+
     class Config:
         # Look for .env in parent directory (backend/.env)
         env_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
