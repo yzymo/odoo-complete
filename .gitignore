@@ -32,9 +32,11 @@ storage/extracted_images/
 storage/exports/
 storage/uploads/
 storage/cache/
+storage/humain/
+storage/source_documents/
 
 # Keep storage structure but ignore content
-!storage/.gitkeep
+!storage/*/.gitkeep
 
 # Node.js
 node_modules/
