@@ -1,7 +1,89 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   GCS Design System — single source of truth.
+   Tailwind v4 reads these tokens and generates the utilities the app consumes
+   (bg-bleu-nuit, text-orange-feu, font-heading, rounded-card, shadow-card …).
+   NEVER hardcode these literals elsewhere — add/extend tokens here instead.
+   ========================================================================== */
+@theme {
+  /* ── Couleurs ─────────────────────────────────────────────────────────── */
+  --color-bleu-nuit: #11363e; /* primary  — boutons, titres, footer, texte clé */
+  --color-orange-feu: #ff6637; /* accent   — état actif, highlights, marqueur IA */
+  --color-orange-hover: #fa8232; /* hover des éléments orange                    */
+  --color-bleu-petrole: #027986; /* secondary — actions secondaires, liens, infos */
+  --color-ivoire: #eeebe4; /* fond chaud — sections, cartes douces           */
+  --color-sable: #b89f91; /* blocs décoratifs                               */
+  --color-gris-1: #5f6c72; /* texte courant / secondaire                     */
+  --color-gris-0: #d4d8dd; /* bordures cartes & champs                       */
+  --color-gris-400: #929fa5; /* texte atténué (footer)                         */
+  --color-blanc: #ffffff; /* surfaces                                       */
+
+  /* Feedback — dérivés sur la base GCS, contrastes AA vérifiés sur blanc */
+  --color-succes: #1b8a5a;
+  --color-succes-fond: #e7f4ee;
+  --color-alerte: #b5521f; /* variante foncée d'orangeFeu pour texte AA      */
+  --color-alerte-fond: #fdeee7;
+  --color-erreur: #c0392b;
+  --color-erreur-fond: #fbeae8;
+  --color-info: #027986; /* = bleuPetrole                                  */
+  --color-info-fond: #e6f3f4;
+
+  /* ── Typographie ──────────────────────────────────────────────────────── */
+  --font-heading: "Anek Latin", system-ui, -apple-system, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, sans-serif;
+
+  /* Échelle de titres (les 70/56/50 px sont réservés au hero marketing ;
+     en applicatif on utilise H4/H5). */
+  /* Line-height 1 (100%) matches the GCS Figma title tokens. */
+  --text-h1: 70px;
+  --text-h1--line-height: 1;
+  --text-h1--font-weight: 300;
+  --text-h2: 56px;
+  --text-h2--line-height: 1;
+  --text-h2--font-weight: 300;
+  --text-h3: 50px;
+  --text-h3--line-height: 1;
+  --text-h3--font-weight: 300;
+  --text-h4: 42px;
+  --text-h4--line-height: 1;
+  --text-h4--font-weight: 300;
+  --text-h5: 30px;
+  --text-h5--line-height: 1;
+  --text-h5--font-weight: 300;
+
+  /* ── Rayons ───────────────────────────────────────────────────────────── */
+  --radius-button: 2px;
+  --radius-card: 6px;
+
+  /* ── Ombres ───────────────────────────────────────────────────────────── */
+  --shadow-card: 0 0 12px rgba(71, 81, 86, 0.12);
+  --shadow-card-hover: 0 0 12px rgba(71, 81, 86, 0.2);
+  --shadow-strong: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
 @layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-ivoire font-body text-gris-1;
+  }
+
+  /* Titres : Anek Latin Light, bleu nuit. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-light text-bleu-nuit;
+  }
+
+  /* Focus visible cohérent et accessible sur tout le produit. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-bleu-petrole;
   }
 }

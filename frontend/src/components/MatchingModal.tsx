@@ -12,10 +12,12 @@ import {
   AlertCircle,
   Package,
   ExternalLink,
-  Loader2,
-  ArrowRight,
 } from 'lucide-react';
 import { odooApi, OdooProduct, CatalogMatch } from '../api/odoo';
+import { Badge, type BadgeVariant } from './ui/Badge';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
+import { Spinner } from './ui/Spinner';
 
 interface MatchingModalProps {
   product: OdooProduct;
@@ -23,12 +25,12 @@ interface MatchingModalProps {
   onClose: () => void;
 }
 
-// Score color mapping
-function getScoreColor(score: number): string {
-  if (score >= 0.95) return 'bg-green-100 text-green-800 border-green-200';
-  if (score >= 0.80) return 'bg-blue-100 text-blue-800 border-blue-200';
-  if (score >= 0.60) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-  return 'bg-gray-100 text-gray-800 border-gray-200';
+// Score tier -> badge variant mapping (preserves existing tiering)
+function getScoreVariant(score: number): BadgeVariant {
+  if (score >= 0.95) return 'success';
+  if (score >= 0.8) return 'info';
+  if (score >= 0.6) return 'warning';
+  return 'neutral';
 }
 
 // Match type labels
@@ -45,7 +47,7 @@ function getMatchTypeLabel(matchType: string): string {
   return labels[matchType] || matchType;
 }
 
-export default function MatchingModal({ product, isOpen, onClose }: MatchingModalProps) {
+export default function MatchingModal({ product, isOpen, onClose }: Readonly<MatchingModalProps>) {
   const navigate = useNavigate();
   const [selectedMatch, setSelectedMatch] = useState<CatalogMatch | null>(null);
 
@@ -62,48 +64,52 @@ export default function MatchingModal({ product, isOpen, onClose }: MatchingModa
 
   if (!isOpen) return null;
 
-  const handleViewProduct = (productId: string) => {
-    navigate(`/products/${productId}`);
+  const handleCompareProduct = (productId: string) => {
+    navigate(`/odoo/products/${product.id}?match=${productId}`);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
-      <div
+      <button
+        type="button"
+        aria-label="Fermer la fenêtre de correspondance"
         className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+        <Card className="relative w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-strong">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gris-0">
             <div className="flex items-center gap-3">
-              <Search className="h-6 w-6 text-purple-600" />
+              <Search className="h-6 w-6 text-bleu-petrole" aria-hidden="true" />
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="font-heading text-lg font-semibold text-bleu-nuit">
                   Recherche de correspondances
                 </h2>
-                <p className="text-sm text-gray-500">
-                  Produit Odoo: {product.name}
+                <p className="text-sm text-gris-400">
+                  Produit Odoo : {product.name}
                 </p>
               </div>
             </div>
             <button
+              type="button"
+              aria-label="Fermer"
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
+              className="rounded-button text-gris-400 hover:text-bleu-nuit focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bleu-petrole"
             >
-              <X className="h-6 w-6" />
+              <X className="h-6 w-6" aria-hidden="true" />
             </button>
           </div>
 
           {/* Content */}
           <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
             {/* Odoo Product Info */}
-            <div className="px-6 py-4 bg-purple-50 border-b border-purple-100">
-              <h3 className="text-sm font-medium text-purple-900 mb-3">
+            <div className="px-6 py-4 bg-ivoire border-b border-gris-0">
+              <h3 className="text-sm font-medium text-bleu-nuit mb-3">
                 Produit Odoo source
               </h3>
               <div className="flex items-start gap-4">
@@ -111,36 +117,36 @@ export default function MatchingModal({ product, isOpen, onClose }: MatchingModa
                   <img
                     src={`data:image/png;base64,${product.image_small}`}
                     alt={product.name}
-                    className="w-16 h-16 rounded object-cover bg-white"
+                    className="w-16 h-16 rounded object-cover bg-blanc"
                   />
                 ) : (
-                  <div className="w-16 h-16 rounded bg-white flex items-center justify-center">
-                    <Package className="h-8 w-8 text-gray-300" />
+                  <div className="w-16 h-16 rounded bg-blanc flex items-center justify-center">
+                    <Package className="h-8 w-8 text-gris-400" aria-hidden="true" />
                   </div>
                 )}
                 <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
                   <div>
-                    <span className="text-purple-700">Code:</span>{' '}
+                    <span className="text-bleu-petrole">Code :</span>{' '}
                     <span className="font-mono">{product.default_code || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-purple-700">Barcode:</span>{' '}
+                    <span className="text-bleu-petrole">Code-barres :</span>{' '}
                     <span className="font-mono">{product.barcode || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-purple-700">EAN:</span>{' '}
+                    <span className="text-bleu-petrole">EAN :</span>{' '}
                     <span className="font-mono">{product.code_ean || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-purple-700">Constructeur:</span>{' '}
+                    <span className="text-bleu-petrole">Constructeur :</span>{' '}
                     {product.constructeur || '-'}
                   </div>
                   <div>
-                    <span className="text-purple-700">Ref:</span>{' '}
+                    <span className="text-bleu-petrole">Réf :</span>{' '}
                     <span className="font-mono">{product.ref_constructeur || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-purple-700">Prix:</span>{' '}
+                    <span className="text-bleu-petrole">Prix :</span>{' '}
                     {product.list_price?.toFixed(2) || '0.00'} €
                   </div>
                 </div>
@@ -150,17 +156,17 @@ export default function MatchingModal({ product, isOpen, onClose }: MatchingModa
             {/* Loading State */}
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 text-purple-600 animate-spin mb-3" />
-                <p className="text-gray-600">Recherche en cours...</p>
+                <Spinner className="h-8 w-8 mb-3" label="Recherche en cours…" />
+                <p className="text-gris-1">Recherche en cours…</p>
               </div>
             )}
 
             {/* Error State */}
             {error && (
               <div className="px-6 py-8 text-center">
-                <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
-                <p className="text-red-600">Erreur lors de la recherche</p>
-                <p className="text-sm text-gray-500 mt-1">
+                <AlertCircle className="h-12 w-12 text-erreur mx-auto mb-3" aria-hidden="true" />
+                <p className="text-erreur">Erreur lors de la recherche</p>
+                <p className="text-sm text-gris-400 mt-1">
                   {error instanceof Error ? error.message : 'Erreur inconnue'}
                 </p>
               </div>
@@ -171,22 +177,22 @@ export default function MatchingModal({ product, isOpen, onClose }: MatchingModa
               <div className="px-6 py-4">
                 {/* Results Header */}
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-medium text-gray-900">
+                  <h3 className="text-sm font-medium text-bleu-nuit">
                     Correspondances trouvées
                   </h3>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-gris-400">
                     {matchingData.total_matches} résultat(s)
                   </span>
                 </div>
 
                 {/* No Results */}
                 {matchingData.matches.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-600 font-medium">
+                  <div className="text-center py-8 bg-ivoire rounded-card">
+                    <Package className="h-12 w-12 text-gris-400 mx-auto mb-3" aria-hidden="true" />
+                    <p className="text-gris-1 font-medium">
                       Aucune correspondance trouvée
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-gris-400 mt-1">
                       Ce produit Odoo n'a pas d'équivalent dans le catalogue local
                     </p>
                   </div>
@@ -194,83 +200,74 @@ export default function MatchingModal({ product, isOpen, onClose }: MatchingModa
                   /* Match List */
                   <div className="space-y-3">
                     {matchingData.matches.map((match) => (
-                      <div
+                      <button
+                        type="button"
                         key={match.product_id}
-                        className={`border rounded-lg p-4 transition-all cursor-pointer ${
+                        className={`border rounded-card p-4 transition-all cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bleu-petrole ${
                           selectedMatch?.product_id === match.product_id
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 hover:border-purple-300 hover:bg-gray-50'
+                            ? 'border-bleu-petrole bg-info-fond'
+                            : 'border-gris-0 hover:border-bleu-petrole hover:bg-ivoire'
                         }`}
+                        style={{ width: '100%' }}
                         onClick={() => setSelectedMatch(match)}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             {/* Match Header */}
                             <div className="flex items-center gap-3 mb-2">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getScoreColor(
-                                  match.score
-                                )}`}
-                              >
+                              <Badge variant={getScoreVariant(match.score)}>
                                 {(match.score * 100).toFixed(0)}%
-                              </span>
-                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                              </Badge>
+                              <Badge variant="neutral">
                                 {getMatchTypeLabel(match.match_type)}
-                              </span>
+                              </Badge>
                               {match.score >= 0.95 && (
-                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-succes" aria-hidden="true" />
                               )}
                             </div>
 
                             {/* Product Info */}
-                            <p className="font-medium text-gray-900 mb-1">
+                            <p className="font-medium text-bleu-nuit mb-1">
                               {match.product_name}
                             </p>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gris-1">
                               {match.default_code && (
                                 <span>
-                                  Code: <span className="font-mono">{match.default_code}</span>
+                                  Code : <span className="font-mono">{match.default_code}</span>
                                 </span>
                               )}
                               {match.barcode && (
                                 <span>
-                                  Barcode: <span className="font-mono">{match.barcode}</span>
+                                  Code-barres : <span className="font-mono">{match.barcode}</span>
                                 </span>
                               )}
                               {match.constructeur && (
-                                <span>Constructeur: {match.constructeur}</span>
+                                <span>Constructeur : {match.constructeur}</span>
                               )}
                             </div>
 
                             {/* Match Details */}
-                            <p className="text-xs text-gray-500 mt-2">
+                            <p className="text-xs text-gris-400 mt-2">
                               {match.match_details}
                             </p>
                           </div>
 
-                          {/* View Button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleViewProduct(match.product_id);
-                            }}
-                            className="flex items-center gap-1 px-3 py-1.5 text-sm text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded-md transition-colors"
-                          >
-                            Voir
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </button>
+                          <span className="flex items-center gap-1 px-3 py-1.5 text-sm text-bleu-petrole rounded-button bg-info-fond">
+                            Sélectionner
+                            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                          </span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
 
-                {/* Search Criteria Debug (collapsible) */}
+                {/* Search Criteria (collapsible) */}
                 <details className="mt-6">
-                  <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600">
+                  <summary className="text-xs text-gris-400 cursor-pointer hover:text-gris-1">
                     Critères de recherche utilisés
                   </summary>
-                  <div className="mt-2 p-3 bg-gray-50 rounded text-xs font-mono text-gray-600">
+                  <div className="mt-2 p-3 bg-ivoire rounded-card text-xs font-mono text-gris-1">
                     <pre>{JSON.stringify(matchingData.search_criteria, null, 2)}</pre>
                   </div>
                 </details>
@@ -279,31 +276,29 @@ export default function MatchingModal({ product, isOpen, onClose }: MatchingModa
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-            <p className="text-sm text-gray-500">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-gris-0 bg-ivoire">
+            <p className="text-sm text-gris-400">
               {matchingData?.total_matches
                 ? `${matchingData.total_matches} correspondance(s) trouvée(s)`
                 : 'Recherche de correspondances'}
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
+              <Button variant="secondary" size="sm" onClick={onClose}>
                 Fermer
-              </button>
+              </Button>
               {selectedMatch && (
-                <button
-                  onClick={() => handleViewProduct(selectedMatch.product_id)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-purple-600 rounded-md hover:bg-purple-700"
+                <Button
+                  variant="primary"
+                  size="sm"
+                  withArrow
+                  onClick={() => handleCompareProduct(selectedMatch.product_id)}
                 >
-                  Voir le produit
-                  <ArrowRight className="h-4 w-4" />
-                </button>
+                  Ouvrir le comparateur
+                </Button>
               )}
             </div>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

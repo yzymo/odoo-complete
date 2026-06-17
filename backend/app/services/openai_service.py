@@ -43,7 +43,7 @@ FABRICANT:
 DESCRIPTIONS:
 - description_courte (description courte du produit)
 - description_ecommerce (description détaillée pour e-commerce, format HTML possible)
-- features_description (caractéristiques techniques détaillées)
+- features_description (caractéristiques techniques détaillées ; si des puces/bullet points sont présents, les formater en HTML <ul><li>...</li></ul>)
 
 DIMENSIONS ET POIDS:
 - length (longueur en mm)
@@ -101,7 +101,8 @@ class OpenAIService:
 
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.openai_api_key)
-        self.default_model = "gpt-3.5-turbo"  # MVP uses GPT-3.5 for cost efficiency
+        # gpt-4o-mini: 16k output tokens, cheaper than gpt-3.5-turbo, no truncation issues
+        self.default_model = "gpt-4o-mini"
 
     async def extract_product_data(
         self,
@@ -172,10 +173,18 @@ class OpenAIService:
                         "content": prompt
                     }
                 ],
-                temperature=0,  # Deterministic output
-                max_tokens=2000,
-                response_format={"type": "json_object"}  # Force JSON response
+                temperature=0,
+                max_tokens=16000,
+                response_format={"type": "json_object"}
             )
+
+            finish_reason = response.choices[0].finish_reason
+            if finish_reason == "length":
+                logger.warning(
+                    f"Output truncated (finish_reason=length) for model {model_to_use} "
+                    f"({len(text)} chars input) — retrying with halved input"
+                )
+                return await self._call_openai(text[: len(text) // 2], model)
 
             # Parse response
             content = response.choices[0].message.content
@@ -300,30 +309,9 @@ class OpenAIService:
             "error": "Not implemented"
         }
 
-    def select_model(self, text_length: int, complexity_score: float = 0.5) -> str:
-        """
-        Intelligently select GPT model based on text characteristics.
-
-        Args:
-            text_length: Length of text in characters
-            complexity_score: Estimated complexity (0-1)
-
-        Returns:
-            Model name to use
-        """
-        # Simple logic for MVP - always use GPT-3.5
-        # In Phase 3, we'll add intelligent selection for GPT-4
-
-        if text_length < 500 and complexity_score < 0.3:
-            return "gpt-3.5-turbo"
-
-        if complexity_score > 0.7 or text_length > 5000:
-            # For complex/long text, GPT-4 would be better
-            # But for MVP, stick with GPT-3.5
-            logger.info("Complex text detected - in production would use GPT-4")
-            return "gpt-3.5-turbo"
-
-        return "gpt-3.5-turbo"
+    def select_model(self) -> str:
+        """Return the active default model."""
+        return self.default_model
 
     async def batch_extract(
         self,

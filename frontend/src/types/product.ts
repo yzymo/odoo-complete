@@ -3,6 +3,16 @@
  * Corresponds to backend Pydantic schemas.
  */
 
+export interface OdooMatchInfo {
+  odoo_id: number;
+  score?: number;
+  match_label?: string;
+  /** True when applied automatically (score ≥ 90%). */
+  auto: boolean;
+  applied_fields: string[];
+  matched_at?: string;
+}
+
 export interface ProductImage {
   image_id: string;
   is_main: boolean;
@@ -29,6 +39,7 @@ export interface ProductSource {
   source_id: string;
   origin_file: string;
   origin_file_type: string;
+  source_type?: string;        // "pdf" | "web_scrape" — set on new documents
   page_number?: number;
   extraction_type: string;
   extracted_text?: string;
@@ -111,6 +122,11 @@ export interface Product {
   image_1920?: string;
   image_1024?: string;
   product_template_image_ids: number[];
+  /** Web-scraped image URLs: index 0 = main, rest = gallery */
+  image_urls?: string[];
+  source_url?: string;
+  /** Web-scrape origin URLs (index 0 = primary). */
+  scrape_source_urls?: string[];
 
   // Documents
   fiche_constructeur?: ProductDocument;
@@ -126,6 +142,8 @@ export interface Product {
   product_tmpl_id?: number;
   odoo_product_tmpl_id?: number;
   odoo_id?: number;
+  /** Link to the Odoo product this catalog product was matched/applied to. */
+  odoo_match?: OdooMatchInfo;
 
   // Deduplication
   duplicate_group_id?: string;
@@ -141,6 +159,30 @@ export interface Product {
 export interface ProductListResponse {
   products: Product[];
   total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+/** One product inside a duplicate group (GET /products/duplicates/by-code). */
+export interface DuplicateProduct {
+  _id: string;
+  name?: string;
+  constructeur?: string;
+  source_type?: string;
+  status?: string;
+  image_count: number;
+}
+
+export interface DuplicateGroup {
+  default_code: string;
+  count: number;
+  products: DuplicateProduct[];
+}
+
+export interface DuplicatesByCodeResponse {
+  groups: DuplicateGroup[];
+  total_groups: number;
   page: number;
   limit: number;
   pages: number;
@@ -182,10 +224,49 @@ export interface ProductUpdate {
 export interface ExtractionResult {
   message: string;
   filename: string;
+  from_cache?: boolean;
   products_extracted: number;
   products: Array<{
     id: string;
     name?: string;
     default_code?: string;
   }>;
+}
+
+export interface ExtractionFileStatus {
+  filename: string;
+  /** pending → processing → done | cached | skipped | failed */
+  status: 'pending' | 'processing' | 'done' | 'cached' | 'skipped' | 'failed';
+  products: Array<{ id: string; name?: string; default_code?: string }>;
+  product_count: number;
+  from_cache: boolean;
+  error: string | null;
+}
+
+export interface ExtractionJob {
+  job_id: string;
+  source: string;
+  /** pending → running → done | failed */
+  status: string;
+  phase: string;
+  phase_detail: string;
+  created_at?: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  total_files: number;
+  processed_files: number;
+  cached_files_count: number;
+  failed_files_count: number;
+  total_products: number;
+  file_statuses: ExtractionFileStatus[];
+  summary: {
+    total_files: number;
+    processed_successfully: number;
+    cached: number;
+    failed: number;
+    total_products_extracted: number;
+    images_processed?: number;
+    images_associated?: number;
+  } | null;
+  error: string | null;
 }

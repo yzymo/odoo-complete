@@ -38,6 +38,15 @@ storage/source_documents/
 # Keep storage structure but ignore content
 !storage/*/.gitkeep
 
+# Generated storage artifacts regardless of path (handles Windows→Linux path drift)
+# The storage_directory default was a Windows absolute path which resolves as a
+# relative path on Linux, creating backend/c:\Users\...\ directories.
+**/extracted_images/
+**/exports/*.xlsx
+**/uploads/
+backend/c:/
+backend/c:\
+
 # Node.js
 node_modules/
 npm-debug.log*

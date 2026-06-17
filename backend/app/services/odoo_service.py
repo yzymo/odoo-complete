@@ -99,7 +99,7 @@ class OdooService:
         Execute a method on an Odoo model.
 
         Args:
-            model: Odoo model name (e.g., 'product.template')
+            model: Odoo model name (e.g., self._MODEL)
             method: Method to call (e.g., 'search_read')
             args: Positional arguments
             kwargs: Keyword arguments
@@ -125,6 +125,8 @@ class OdooService:
         except Exception as e:
             logger.error(f"Odoo execute_kw error on {model}.{method}: {e}")
             raise
+
+    _MODEL = "product.template"
 
     # Standard fields to retrieve from Odoo (matching our catalog schema)
     PRODUCT_FIELDS = [
@@ -183,6 +185,29 @@ class OdooService:
         "write_date",
     ]
 
+    # Fields that are safe to update from the application
+    PRODUCT_UPDATEABLE_FIELDS = {
+        "default_code",
+        "name",
+        "barcode",
+        "Code_EAN",
+        "constructeur",
+        "refConstructeur",
+        "description_courte",
+        "description_ecommerce",
+        "features_description",
+        "country_of_origin",
+        "length",
+        "width",
+        "height",
+        "weight",
+        "hs_code",
+        "contient_du_lithium",
+        "list_price",
+        "active",
+        "is_published",
+    }
+
     def get_products(
         self,
         limit: int = 50,
@@ -211,14 +236,14 @@ class OdooService:
         try:
             # Get total count
             total = self.execute_kw(
-                'product.template',
+                self._MODEL,
                 'search_count',
                 [domain]
             )
 
             # Get products
             products = self.execute_kw(
-                'product.template',
+                self._MODEL,
                 'search_read',
                 [domain],
                 {
@@ -257,7 +282,7 @@ class OdooService:
 
         try:
             products = self.execute_kw(
-                'product.template',
+                self._MODEL,
                 'search_read',
                 [[['id', '=', product_id]]],
                 {'fields': fields}
@@ -334,6 +359,128 @@ class OdooService:
                 "url": self.url,
                 "database": self.db
             }
+
+    def get_product_gallery(self, product_id: int) -> List[Dict[str, Any]]:
+        """Return product.image records for a product template (gallery images).
+
+        Each record contains ``id``, ``name``, and ``image_1920`` (base64 string).
+        """
+        records = self.execute_kw(
+            "product.image",
+            "search_read",
+            [[["product_tmpl_id", "=", product_id]]],
+            {"fields": ["id", "name", "image_1920"], "order": "id asc"},
+        )
+        return [
+            {
+                "id": r["id"],
+                "name": r.get("name") or f"Image {r['id']}",
+                "image_1920": r.get("image_1920") or None,
+            }
+            for r in (records or [])
+        ]
+
+    def update_product_images(
+        self,
+        product_id: int,
+        main_image_b64: Optional[str] = None,
+        gallery_images: Optional[List[Dict[str, str]]] = None,
+        clear_gallery: bool = True,
+    ) -> bool:
+        """Write images to an Odoo product.template via XML-RPC.
+
+        main_image_b64
+            Base64 string written to ``image_1920``.
+            Odoo automatically generates all thumbnails (512 / 256 / 128 / 64).
+            Pass ``False`` (or empty string) to clear the main image.
+            Pass ``None`` to leave it untouched.
+
+        gallery_images
+            List of ``{"name": str, "b64": str}`` dicts.
+            Each dict creates one ``product.image`` record
+            (``product_template_image_ids`` One2many).
+            Pass ``None`` to skip gallery entirely.
+
+        clear_gallery
+            When ``True``, sends ORM command ``(5, 0, 0)`` which unlinks
+            **all** existing ``product.image`` records before creating the
+            new ones — equivalent to a full replace.
+            When ``False``, new images are appended to the existing gallery.
+
+        ORM command reference for One2many fields:
+            (0, 0, vals)  — create a new record
+            (2, id, 0)    — delete an existing record
+            (5, 0, 0)     — delete **all** linked records (clear)
+        """
+        values: Dict[str, Any] = {}
+
+        if main_image_b64 is not None:
+            values["image_1920"] = main_image_b64 if main_image_b64 else False
+
+        if clear_gallery or gallery_images is not None:
+            commands: List = []
+            if clear_gallery:
+                commands.append((5, 0, 0))
+            for idx, img in enumerate(gallery_images or []):
+                commands.append((0, 0, {
+                    "name": img.get("name") or f"Image {idx + 1}",
+                    "image_1920": img["b64"],
+                }))
+            if commands:
+                values["product_template_image_ids"] = commands
+
+        if not values:
+            return False
+
+        result = self.execute_kw(
+            "product.template",
+            "write",
+            [[product_id], values],
+        )
+        logger.info(
+            "Updated images for product %d: fields=%s",
+            product_id, list(values.keys()),
+        )
+        return bool(result)
+
+    def update_product(self, product_id: int, values: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Update an Odoo product.template by ID.
+
+        Args:
+            product_id: Odoo product.template ID
+            values: Values to write using Odoo field names
+
+        Returns:
+            Updated product dict or None if not found
+        """
+        if not values:
+            raise ValueError("No fields provided for update")
+
+        sanitized_values = {
+            key: value
+            for key, value in values.items()
+            if key in self.PRODUCT_UPDATEABLE_FIELDS
+        }
+
+        if not sanitized_values:
+            raise ValueError("No updatable fields provided")
+
+        try:
+            updated = self.execute_kw(
+                self._MODEL,
+                'write',
+                [[product_id], sanitized_values]
+            )
+
+            if not updated:
+                return None
+
+            return self.get_product_by_id(product_id)
+
+        except Exception as e:
+            logger.error(f"Error updating Odoo product {product_id}: {e}")
+            raise
 
 
 # Singleton instance for reuse

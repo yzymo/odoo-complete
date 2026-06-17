@@ -81,6 +81,19 @@ class Database:
             await self.db.openai_cache.create_index("prompt_hash")
             await self.db.openai_cache.create_index("expires_at", expireAfterSeconds=0)  # TTL index
 
+            # Scraping jobs collection indexes
+            await self.db.scraping_jobs.create_index("job_id", unique=True)
+            await self.db.scraping_jobs.create_index("status")
+            await self.db.scraping_jobs.create_index("url")
+            await self.db.scraping_jobs.create_index("created_at")
+
+            # URL product cache indexes
+            await self.db.url_product_cache.create_index("url_hash", unique=True)
+            await self.db.url_product_cache.create_index("expires_at", expireAfterSeconds=0)  # TTL 24h
+
+            # File hash cache indexes
+            await self.db.file_hash_cache.create_index("file_hash", unique=True)
+
             logger.info("MongoDB indexes created successfully")
 
         except Exception as e:

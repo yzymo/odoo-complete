@@ -54,7 +54,7 @@ async def export_to_excel(
             products, total = await storage_service.get_products(skip=0, limit=limit or 10000, filters=filters)
 
         if not products:
-            raise HTTPException(status_code=404, detail="No products found to export")
+            raise HTTPException(status_code=404, detail="Aucun produit à exporter")
 
         logger.info(f"Exporting {len(products)} products to Excel")
 
@@ -91,7 +91,7 @@ async def export_to_excel(
         raise
     except Exception as e:
         logger.error(f"Error during Excel export: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Échec de l'export : {str(e)}")
 
 
 @router.get("/excel/template")
@@ -121,7 +121,7 @@ async def download_excel_template():
 
     except Exception as e:
         logger.error(f"Error creating template: {e}")
-        raise HTTPException(status_code=500, detail=f"Template creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Échec de la création du modèle : {str(e)}")
 
 
 @router.get("/stats")
@@ -156,4 +156,4 @@ async def get_export_stats(
 
     except Exception as e:
         logger.error(f"Error getting export stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Échec de la récupération des statistiques : {str(e)}")

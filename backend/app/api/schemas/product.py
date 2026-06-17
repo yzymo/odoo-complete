@@ -88,6 +88,21 @@ class ExtractionMetadata(BaseModel):
     errors: List[ExtractionError] = Field(default_factory=list)
 
 
+class OdooMatchInfo(BaseModel):
+    """Link to the Odoo product this catalog product was matched/applied to.
+
+    Set by POST /products/{id}/match-to-odoo. Persisting it makes the match
+    idempotent: an already-matched product is no longer re-searched or re-applied
+    when the list is revisited.
+    """
+    odoo_id: int
+    score: Optional[float] = None
+    match_label: Optional[str] = None
+    auto: bool = False  # True when applied automatically (score ≥ 90%)
+    applied_fields: List[str] = Field(default_factory=list)
+    matched_at: Optional[datetime] = None
+
+
 class ProductBase(BaseModel):
     """Base product fields (for create/update)."""
 
@@ -136,6 +151,10 @@ class ProductBase(BaseModel):
     image_1920: Optional[str] = None
     image_1024: Optional[str] = None
     product_template_image_ids: List[int] = Field(default_factory=list)
+    # Web-scraped image URLs: index 0 = main (→ image_1920), rest = gallery
+    image_urls: List[str] = Field(default_factory=list)
+    # Source URLs from web scraping (provenance)
+    scrape_source_urls: List[str] = Field(default_factory=list)
 
     # Documents
     fiche_constructeur: Optional[ProductDocument] = None
@@ -211,6 +230,7 @@ class Product(ProductBase):
     product_tmpl_id: Optional[int] = None
     odoo_product_tmpl_id: Optional[int] = None
     odoo_id: Optional[int] = None
+    odoo_match: Optional[OdooMatchInfo] = None
 
     # Deduplication
     duplicate_group_id: Optional[str] = None

@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.database import database
-from app.api.routes import products, extraction, images, export, odoo
+from app.api.routes import products, extraction, images, export, odoo, scraper, enrichment
 from app.config import settings, get_storage_path
 import logging
 import os
@@ -112,6 +112,18 @@ app.include_router(
     odoo.router,
     prefix="/api/v1/odoo",
     tags=["Odoo"]
+)
+
+app.include_router(
+    scraper.router,
+    prefix="/api/v1/scraper",
+    tags=["Scraper"]
+)
+
+app.include_router(
+    enrichment.router,
+    prefix="/api/v1/enrichment",
+    tags=["Enrichment"]
 )
 
 

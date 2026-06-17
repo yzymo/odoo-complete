@@ -20,8 +20,12 @@ class Settings(BaseSettings):
     # Redis (for background tasks)
     redis_url: str = "redis://localhost:6379"
 
-    # Storage
-    storage_directory: str = "c:\\Users\\user\\odoo-complete\\storage"
+    # Storage — resolved at runtime so it works on both Windows and Linux.
+    # The default places 'storage/' next to the project root.
+    # Override with STORAGE_DIRECTORY in your .env if you need a custom path.
+    storage_directory: str = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "storage")
+    )
 
     # API Configuration
     api_host: str = "0.0.0.0"

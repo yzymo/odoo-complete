@@ -30,7 +30,7 @@ async def get_image(size: str, filename: str):
     if size not in valid_sizes:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid size. Must be one of: {', '.join(valid_sizes)}"
+            detail=f"Taille invalide. Doit être l'une des suivantes : {', '.join(valid_sizes)}"
         )
 
     # Build file path
@@ -39,11 +39,11 @@ async def get_image(size: str, filename: str):
 
     # Security: ensure path is within images directory
     if not os.path.abspath(file_path).startswith(os.path.abspath(base_dir)):
-        raise HTTPException(status_code=403, detail="Invalid file path")
+        raise HTTPException(status_code=403, detail="Chemin de fichier invalide")
 
     # Check if file exists
     if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Image not found")
+        raise HTTPException(status_code=404, detail="Image introuvable")
 
     # Return image
     return FileResponse(

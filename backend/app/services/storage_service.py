@@ -10,6 +10,7 @@ from bson import ObjectId
 from pymongo.errors import BulkWriteError, DuplicateKeyError
 from app.api.schemas.product import Product, ProductCreate, ProductUpdate, ProductSource, ExtractionMetadata
 from app.core.database import get_database
+from app.services.dedup_service import compute_dedup_hash
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,17 @@ class StorageService:
             if not document.get("Code_EAN"):
                 document.pop("Code_EAN", None)
 
+            # Stable deduplication key so the same logical product from different
+            # sources shares a duplicate_group_id and can be merged later.
+            dedup_hash = compute_dedup_hash(document)
+            if dedup_hash:
+                document["duplicate_group_id"] = dedup_hash
+
+            # Collect the originating URL for provenance tracking.
+            source_url = document.pop("source_url", None)
+            if source_url:
+                document["scrape_source_urls"] = [source_url]
+
             # Insert into MongoDB
             result = await self.products_collection.insert_one(document)
             document["_id"] = result.inserted_id
@@ -212,13 +224,14 @@ class StorageService:
                 existing_confidence = existing_scores.get(field, 0.5)
 
                 # Keep new value if:
-                # 1. Existing is null/empty, OR
+                # 1. Existing is null/empty (also handles empty lists), OR
                 # 2. New confidence is higher
-                should_update = (
+                existing_is_empty = (
                     existing_value is None or
                     (isinstance(existing_value, str) and not existing_value.strip()) or
-                    new_confidence > existing_confidence
+                    (isinstance(existing_value, list) and not existing_value)
                 )
+                should_update = existing_is_empty or new_confidence > existing_confidence
 
                 if should_update:
                     updates[field] = new_value
@@ -229,15 +242,23 @@ class StorageService:
             existing_sources = existing.get("sources", [])
             merged_sources = existing_sources + new_sources
 
+            # Track additional source URLs without duplicating entries.
+            source_url = product_data.get("source_url")
+            add_to_set = {}
+            if source_url:
+                add_to_set["scrape_source_urls"] = source_url
+
             # Update the product
             update_doc = {
                 "$set": {
                     **updates,
                     "extraction_metadata.field_confidence_scores": existing_scores,
                     "sources": merged_sources,
-                    "updated_at": datetime.utcnow()
-                }
+                    "updated_at": datetime.utcnow(),
+                },
             }
+            if add_to_set:
+                update_doc["$addToSet"] = add_to_set
 
             result = await self.products_collection.update_one(
                 {"_id": existing["_id"]},
@@ -421,6 +442,32 @@ class StorageService:
             logger.error(f"Error updating product {product_id}: {e}")
             raise
 
+    async def set_odoo_match(
+        self,
+        product_id: str,
+        match_info: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Record the Odoo product this catalog product was matched/applied to.
+
+        Written with a direct ``$set`` (not update_product) so it does not pollute
+        the manual-edit history. Also mirrors ``odoo_id`` for backward compatibility.
+        """
+        try:
+            result = await self.products_collection.update_one(
+                {"_id": ObjectId(product_id)},
+                {"$set": {
+                    "odoo_match": match_info,
+                    "odoo_id": match_info.get("odoo_id"),
+                    "updated_at": datetime.utcnow(),
+                }},
+            )
+            if result.matched_count == 0:
+                return None
+            return await self.get_product_by_id(product_id)
+        except Exception as e:
+            logger.error(f"Error setting Odoo match for product {product_id}: {e}")
+            raise
+
     async def delete_product(self, product_id: str) -> bool:
         """Delete a product by ID."""
         try:
@@ -482,7 +529,13 @@ class StorageService:
             query["extraction_metadata.status"] = filters["status"]
 
         if "source_type" in filters:
-            query["sources.source_type"] = filters["source_type"]
+            st = filters["source_type"]
+            # Older documents stored the type in "origin_file_type"; newer ones also have
+            # "source_type".  Match either field so legacy data is not excluded.
+            query["$or"] = [
+                {"sources.source_type": st},
+                {"sources.origin_file_type": st},
+            ]
 
         return query
 
