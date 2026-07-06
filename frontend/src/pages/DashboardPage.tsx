@@ -27,8 +27,8 @@ function resolveNextAction(s: ReturnType<typeof useDashboardStats>): NextAction 
   if ((s.raw ?? 0) > 0)
     return {
       message: `${s.raw} produit(s) brut(s) à enrichir.`,
-      cta: "Lancer la recherche web",
-      to: "/scraper",
+      cta: "Rapprocher les fiches avec Odoo",
+      to: "/products?status=raw",
     };
   if ((s.duplicateGroups ?? 0) > 0)
     return {
@@ -78,7 +78,7 @@ export default function DashboardPage() {
             {/* Status tiles — all from real endpoints */}
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
               <StatTile icon={Package} label="Total produits" value={stats.total} loading={stats.isLoading} to="/products" />
-              <StatTile icon={FileWarning} label="À enrichir" value={stats.raw} hint="Fiches brutes" loading={stats.isLoading} to="/scraper" accent />
+              <StatTile icon={FileWarning} label="À enrichir" value={stats.raw} hint="Fiches brutes" loading={stats.isLoading} to="/products?status=raw" accent />
               <StatTile icon={Sparkles} label="Enrichis" value={stats.enriched} loading={stats.isLoading} to="/products" />
               <StatTile icon={Copy} label="Doublons" value={stats.duplicateGroups} hint="Groupes" loading={stats.duplicatesLoading} to="/duplicates" />
               <StatTile icon={Server} label="Exportés Odoo" value={stats.exported} loading={stats.isLoading} to="/odoo" />
