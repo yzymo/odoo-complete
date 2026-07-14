@@ -463,6 +463,15 @@ class StorageService:
             )
             if result.matched_count == 0:
                 return None
+
+            # A fiche matched/applied to Odoo has been enriched. Promote
+            # raw → enriched only, so we never downgrade a fiche the user has
+            # since validated or exported.
+            await self.products_collection.update_one(
+                {"_id": ObjectId(product_id), "extraction_metadata.status": "raw"},
+                {"$set": {"extraction_metadata.status": "enriched"}},
+            )
+
             return await self.get_product_by_id(product_id)
         except Exception as e:
             logger.error(f"Error setting Odoo match for product {product_id}: {e}")

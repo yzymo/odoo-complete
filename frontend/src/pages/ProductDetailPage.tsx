@@ -6,10 +6,13 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { productApi } from '../api/products';
-import type { ProductUpdate } from '../types/product';
-import { ArrowLeft, CheckCircle, Edit, Save, X } from 'lucide-react';
+import type { ProductOdooMatch } from '../api/products';
+import type { ProductUpdate, ProductSource, Product, OdooMatchInfo } from '../types/product';
+import { ArrowLeft, CheckCircle, Edit, Link2, Save, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { cn } from '../lib/cn';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge, statusBadge } from '../components/ui/Badge';
@@ -127,7 +130,7 @@ export default function ProductDetailPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between gap-4">
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <ProductHeader
           product={product}
           isEditing={isEditing}
@@ -153,7 +156,7 @@ export default function ProductDetailPage() {
           {/* Identifiers */}
           <Card className="p-6">
             <h2 className="mb-4 font-heading text-h5 font-light text-bleu-nuit">Identifiants</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InfoField
                 label="Code par défaut"
                 value={fv('default_code')}
@@ -181,7 +184,7 @@ export default function ProductDetailPage() {
           {/* Manufacturer */}
           <Card className="p-6">
             <h2 className="mb-4 font-heading text-h5 font-light text-bleu-nuit">Fabricant</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InfoField
                 label="Fabricant"
                 value={fv('constructeur')}
@@ -232,7 +235,7 @@ export default function ProductDetailPage() {
             <h2 className="mb-4 font-heading text-h5 font-light text-bleu-nuit">
               Dimensions et logistique
             </h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InfoField label="Longueur" value={fv('length')} unit="mm" fieldType="number" isEditing={isEditing} onChange={v => setField('length', v)} />
               <InfoField label="Largeur" value={fv('width')} unit="mm" fieldType="number" isEditing={isEditing} onChange={v => setField('width', v)} />
               <InfoField label="Hauteur" value={fv('height')} unit="mm" fieldType="number" isEditing={isEditing} onChange={v => setField('height', v)} />
@@ -245,7 +248,7 @@ export default function ProductDetailPage() {
           {/* Pricing */}
           <Card className="p-6">
             <h2 className="mb-4 font-heading text-h5 font-light text-bleu-nuit">Tarification</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <InfoField
                 label="Prix"
                 value={fv('lst_price')}
@@ -269,18 +272,191 @@ export default function ProductDetailPage() {
   );
 }
 
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  web_scrape: 'Page web',
+  url: 'Page web',
+  pdf: 'Document PDF',
+};
+
+function sourceTypeLabel(source: ProductSource): string {
+  const key = source.source_type ?? source.extraction_type ?? '';
+  return SOURCE_TYPE_LABELS[key] ?? 'Source';
+}
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function OdooLinkedView({ linked }: Readonly<{ linked: OdooMatchInfo }>) {
+  const navigate = useNavigate();
+  const pct = linked.score != null ? Math.round(linked.score * 100) : null;
+  return (
+    <div className="space-y-3">
+      <Badge variant="success" icon={CheckCircle}>
+        {pct != null ? `Lié à Odoo · ${pct}%` : 'Lié à Odoo'}
+      </Badge>
+      <dl className="space-y-1.5 text-sm">
+        <div className="flex justify-between gap-3">
+          <dt className="text-gris-1">Produit Odoo</dt>
+          <dd className="font-medium text-bleu-nuit">#{linked.odoo_id}</dd>
+        </div>
+        {linked.matched_at && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-gris-1">Synchronisé le</dt>
+            <dd className="font-medium text-bleu-nuit">{format(new Date(linked.matched_at), 'PPp', { locale: fr })}</dd>
+          </div>
+        )}
+        {linked.applied_fields?.length > 0 && (
+          <div className="flex justify-between gap-3">
+            <dt className="text-gris-1">Champs transférés</dt>
+            <dd className="font-medium text-bleu-nuit">{linked.applied_fields.length}</dd>
+          </div>
+        )}
+      </dl>
+      <Button variant="secondary" size="sm" withArrow onClick={() => navigate(`/odoo/products/${linked.odoo_id}`)}>
+        Ouvrir le comparateur Odoo
+      </Button>
+    </div>
+  );
+}
+
+function OdooCandidate({ match, onMatch, loading, disabled }: Readonly<{
+  match: ProductOdooMatch;
+  onMatch: (m: ProductOdooMatch) => void;
+  loading: boolean;
+  disabled: boolean;
+}>) {
+  return (
+    <div className="rounded-card border border-gris-0 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-bleu-nuit">{match.name}</p>
+          <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-gris-1">
+            {match.default_code && <span className="font-mono">{match.default_code}</span>}
+            {match.constructeur && <span>{match.constructeur}</span>}
+          </div>
+        </div>
+        <Badge variant={getConfidenceBadgeVariant(match.score)}>{Math.round(match.score * 100)}%</Badge>
+      </div>
+      <Button
+        variant="accent"
+        size="sm"
+        className="mt-3 w-full"
+        loading={loading}
+        disabled={disabled}
+        onClick={() => onMatch(match)}
+      >
+        {!loading && <Link2 className="h-4 w-4" aria-hidden="true" />}
+        Mettre en correspondance
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Odoo sync panel for the detail page. Surfaces the link state the list page
+ * already shows (and that this page previously hid), and — unlike the list,
+ * which only offers a button in the 80–90% band — lets the user match to any
+ * candidate so a validated fiche is never stuck without a way to reach Odoo.
+ */
+function ProductOdooSync({ product }: Readonly<{ product: Product }>) {
+  const queryClient = useQueryClient();
+  const linked = product.odoo_match ?? null;
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['product-odoo-matches', product._id],
+    queryFn: () => productApi.getOdooMatches(product._id),
+    enabled: !linked,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const mutation = useMutation({
+    mutationFn: (match: ProductOdooMatch) =>
+      productApi.matchToOdoo(product._id, {
+        odoo_id: match.odoo_id,
+        score: match.score,
+        match_label: match.match_label,
+        auto: false,
+      }),
+    onSuccess: (res) => {
+      toast.success(res.message || 'Fiche mise en correspondance avec Odoo');
+      queryClient.invalidateQueries({ queryKey: ['product', product._id] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['export-stats'] });
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error ? err.message : 'Échec de la mise en correspondance'),
+  });
+
+  const matches = data?.matches ?? [];
+  const loadingId = mutation.isPending ? mutation.variables?.odoo_id ?? null : null;
+
+  return (
+    <Card className="p-6">
+      <h2 className="mb-1 font-heading text-h5 font-light text-bleu-nuit">Odoo</h2>
+      {linked ? (
+        <>
+          <p className="mb-4 text-sm text-gris-1">Cette fiche est liée à un produit Odoo.</p>
+          <OdooLinkedView linked={linked} />
+        </>
+      ) : (
+        <>
+          <p className="mb-4 text-sm text-gris-1">Cette fiche n'est pas encore liée à Odoo.</p>
+          {isLoading && (
+            <div className="flex justify-center py-4">
+              <Spinner className="h-6 w-6" />
+            </div>
+          )}
+          {isError && (
+            <p className="text-sm text-erreur">Impossible de récupérer les correspondances Odoo.</p>
+          )}
+          {!isLoading && !isError && matches.length === 0 && (
+            <p className="text-sm text-gris-400">Aucune correspondance Odoo trouvée pour cette fiche.</p>
+          )}
+          {matches.length > 0 && (
+            <div className="space-y-2">
+              {matches.slice(0, 3).map((m) => (
+                <OdooCandidate
+                  key={m.odoo_id}
+                  match={m}
+                  onMatch={mutation.mutate}
+                  loading={loadingId === m.odoo_id}
+                  disabled={mutation.isPending}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 function ProductSidebar({ product, sourcesData }: Readonly<{ product: any; sourcesData: any }>) {
   return (
     <div className="space-y-6">
+      <ProductOdooSync product={product} />
       {sourcesData && sourcesData.sources.length > 0 && (
         <Card className="p-6">
           <h2 className="mb-4 font-heading text-h5 font-light text-bleu-nuit">Sources ({sourcesData.count})</h2>
           <div className="space-y-3">
-            {sourcesData.sources.map((source: any) => (
+            {sourcesData.sources.map((source: ProductSource) => (
               <div key={source.source_id ?? source.origin_file} className="border-l-4 border-bleu-petrole pl-3">
-                <p className="text-sm font-medium text-bleu-nuit">{source.origin_file}</p>
+                {isHttpUrl(source.origin_file) ? (
+                  <a
+                    href={source.origin_file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all text-sm font-medium text-bleu-petrole underline decoration-gris-0 underline-offset-2 hover:decoration-bleu-petrole focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bleu-petrole"
+                  >
+                    {source.origin_file}
+                  </a>
+                ) : (
+                  <p className="break-all text-sm font-medium text-bleu-nuit">{source.origin_file}</p>
+                )}
                 <p className="text-xs text-gris-1">
-                  {source.extraction_type} - Page {source.page_number || 'N/A'}
+                  {sourceTypeLabel(source)}
+                  {source.page_number ? ` · page ${source.page_number}` : ''}
                 </p>
                 <p className="text-xs text-gris-400">
                   Confiance : {(source.confidence_score * 100).toFixed(0)}%
@@ -295,11 +471,11 @@ function ProductSidebar({ product, sourcesData }: Readonly<{ product: any; sourc
         <div className="space-y-2 text-sm">
           <div>
             <span className="text-gris-1">Créé le :</span>
-            <p className="font-medium text-bleu-nuit">{format(new Date(product.created_at), 'PPp')}</p>
+            <p className="font-medium text-bleu-nuit">{format(new Date(product.created_at), 'PPp', { locale: fr })}</p>
           </div>
           <div>
             <span className="text-gris-1">Mis à jour le :</span>
-            <p className="font-medium text-bleu-nuit">{format(new Date(product.updated_at), 'PPp')}</p>
+            <p className="font-medium text-bleu-nuit">{format(new Date(product.updated_at), 'PPp', { locale: fr })}</p>
           </div>
           {product.extraction_metadata?.extraction_job_id && (
             <div>
@@ -388,16 +564,17 @@ function InfoField({ label, value, unit, multiline, confidence, isEditing, field
       </label>
       {isEditing && onChange ? (
         <InfoFieldEditor value={value} multiline={multiline} fieldType={fieldType} onChange={onChange} />
-      ) : renderReadOnlyValue(displayValue, multiline)}
+      ) : renderReadOnlyValue(displayValue, hasValue, multiline)}
     </div>
   );
 }
 
-function renderReadOnlyValue(displayValue: string, multiline?: boolean) {
-  if (multiline) {
-    return <p className="mt-1 whitespace-pre-wrap text-bleu-nuit">{displayValue}</p>;
-  }
-  return <p className="mt-1 font-medium text-bleu-nuit">{displayValue}</p>;
+function renderReadOnlyValue(displayValue: string, hasValue: boolean, multiline?: boolean) {
+  // Absent data must read as absent — mute it so it never looks like a real value.
+  const tone = hasValue ? 'font-medium text-bleu-nuit' : 'text-gris-400';
+  return (
+    <p className={cn('mt-1', multiline && 'whitespace-pre-wrap', tone)}>{displayValue}</p>
+  );
 }
 
 function ProductHeader({ product, isEditing, editName, onNameChange, onBack }: Readonly<{

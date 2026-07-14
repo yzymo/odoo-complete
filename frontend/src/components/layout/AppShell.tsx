@@ -6,8 +6,8 @@ import { getActiveStep } from "../../config/pipeline";
 
 /** App frame: brand nav, persistent journey Stepper, page content, GCS footer. */
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
-  const { pathname } = useLocation();
-  const step = getActiveStep(pathname);
+  const { pathname, search } = useLocation();
+  const step = getActiveStep(pathname, search);
 
   return (
     <div className="flex min-h-screen flex-col bg-ivoire">

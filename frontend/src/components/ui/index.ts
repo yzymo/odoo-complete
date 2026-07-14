@@ -12,4 +12,5 @@ export { EmptyState } from "./EmptyState";
 export { ErrorState } from "./ErrorState";
 export { Skeleton } from "./Skeleton";
 export { Spinner } from "./Spinner";
+export { Modal } from "./Modal";
 export { Logo } from "./Logo";

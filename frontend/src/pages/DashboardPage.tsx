@@ -42,6 +42,12 @@ function resolveNextAction(s: ReturnType<typeof useDashboardStats>): NextAction 
       cta: "Vérifier & exporter",
       to: "/products",
     };
+  if ((s.enriched ?? 0) > 0)
+    return {
+      message: `${s.enriched} fiche(s) enrichie(s) à vérifier avant export.`,
+      cta: "Vérifier les fiches enrichies",
+      to: "/products?status=enriched",
+    };
   return { message: "Tout est à jour. 🎉", cta: "Voir les produits", to: "/products" };
 }
 
@@ -79,7 +85,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
               <StatTile icon={Package} label="Total produits" value={stats.total} loading={stats.isLoading} to="/products" />
               <StatTile icon={FileWarning} label="À enrichir" value={stats.raw} hint="Fiches brutes" loading={stats.isLoading} to="/products?status=raw" accent />
-              <StatTile icon={Sparkles} label="Enrichis" value={stats.enriched} loading={stats.isLoading} to="/products" />
+              <StatTile icon={Sparkles} label="Enrichis" value={stats.enriched} loading={stats.isLoading} to="/products?status=enriched" />
               <StatTile icon={Copy} label="Doublons" value={stats.duplicateGroups} hint="Groupes" loading={stats.duplicatesLoading} to="/duplicates" />
               <StatTile icon={Server} label="Exportés Odoo" value={stats.exported} loading={stats.isLoading} to="/odoo" />
             </div>

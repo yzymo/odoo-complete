@@ -40,8 +40,8 @@ export const PIPELINE_STEPS: PipelineStep[] = [
     label: "Enrichir",
     short: "Enrichir",
     description:
-      "Recherche web et rapprochement (EAN → code-barres → réf. constructeur → nom) pour compléter les champs manquants.",
-    to: "/scraper",
+      "Rapprochement des fiches brutes avec Odoo (EAN → code-barres → réf. constructeur → nom) pour compléter les champs manquants.",
+    to: "/products?status=raw",
     icon: Sparkles,
   },
   {
@@ -58,9 +58,14 @@ export const PIPELINE_STEPS: PipelineStep[] = [
  * Resolve which pipeline step the current route belongs to (1-4), or 0 for the
  * dashboard / unmapped routes. Used to highlight "where am I" in the Stepper.
  */
-export function getActiveStep(pathname: string): number {
+export function getActiveStep(pathname: string, search = ""): number {
   if (pathname.startsWith("/extract")) return 1;
-  if (pathname.startsWith("/products")) return 2;
+  if (pathname.startsWith("/products")) {
+    // The Produits page is the hub for both viewing the extracted fiches
+    // (step 2) and enriching the raw ones via Odoo matching (step 3). The
+    // "?status=raw" filter is the "à enrichir" view, so it belongs to Enrichir.
+    return new URLSearchParams(search).get("status") === "raw" ? 3 : 2;
+  }
   if (pathname.startsWith("/scraper") || pathname.startsWith("/odoo")) return 3;
   if (pathname.startsWith("/duplicates")) return 4;
   return 0;

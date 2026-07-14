@@ -212,7 +212,7 @@ function ImageTile({
 
 // ── OdooCurrentImages (left column) ─────────────────────────────────────────
 
-function OdooCurrentImages({
+export function OdooCurrentImages({
   mainImage1920,
   galleryImages,
 }: Readonly<{
@@ -266,7 +266,7 @@ function OdooCurrentImages({
 
 // ── ExtractedImagePicker (right column) ─────────────────────────────────────
 
-function ExtractedImagePicker({
+export function ExtractedImagePicker({
   odooId,
   extractedProduct,
   selectedMatchId,

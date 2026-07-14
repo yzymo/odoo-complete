@@ -8,7 +8,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { productApi } from '../api/products';
 import type { Product } from '../types/product';
-import { Search, Package, Download, Globe, FileText, ListFilter, CheckCircle, Link2 } from 'lucide-react';
+import { Search, Package, Download, Globe, FileText, ListFilter, CheckCircle, Link2, RefreshCw } from 'lucide-react';
+import { SyncOdooModal } from '../components/SyncOdooModal';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -80,6 +81,8 @@ function ProductMatchAction({ product }: { readonly product: Product }) {
         { duration: 4000 },
       );
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      // The fiche moves raw → enriched, so the dashboard counts change too.
+      queryClient.invalidateQueries({ queryKey: ['export-stats'] });
     },
     onError: (err) =>
       toast.error(err instanceof Error ? err.message : 'Échec de la mise en correspondance'),
@@ -136,6 +139,7 @@ export default function ProductsPage() {
   // (e.g. opening a product and pressing Back returns to the same page).
   const [searchParams, setSearchParams] = useSearchParams();
   const [isExporting, setIsExporting] = useState(false);
+  const [syncProduct, setSyncProduct] = useState<Product | null>(null);
   const navigate = useNavigate();
 
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
@@ -230,8 +234,8 @@ export default function ProductsPage() {
 
       {/* Filters */}
       <Card className="mb-6 p-4">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="relative">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative min-w-0 flex-1 sm:min-w-[16rem]">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gris-400" aria-hidden="true" />
             <input
               type="text"
@@ -246,7 +250,7 @@ export default function ProductsPage() {
           <select
             value={statusFilter}
             onChange={(e) => updateParams({ status: e.target.value, page: null })}
-            className={inputCls}
+            className={cn(inputCls, 'sm:w-44')}
             aria-label="Filtrer par statut"
           >
             <option value="">Tous les statuts</option>
@@ -259,7 +263,7 @@ export default function ProductsPage() {
           <select
             value={sourceFilter}
             onChange={(e) => updateParams({ source: e.target.value, page: null })}
-            className={inputCls}
+            className={cn(inputCls, 'sm:w-44')}
             aria-label="Filtrer par source"
           >
             <option value="">Toutes les sources</option>
@@ -269,9 +273,11 @@ export default function ProductsPage() {
 
           <Button
             type="button"
+            size="sm"
             variant={onlyIncomplete ? 'accent' : 'secondary'}
             onClick={() => updateParams({ incomplete: !onlyIncomplete, page: null })}
             aria-pressed={onlyIncomplete}
+            className="w-full sm:w-auto"
           >
             <ListFilter className="h-4 w-4" />
             Incomplets
@@ -368,7 +374,20 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="ml-4 flex flex-col items-end gap-2">
-                    <ProductMatchAction product={product} />
+                    {!product.odoo_match && product.extraction_metadata?.status === 'validated' ? (
+                      <Button
+                        type="button"
+                        variant="accent"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); setSyncProduct(product); }}
+                        className="whitespace-nowrap"
+                      >
+                        <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                        Synchroniser
+                      </Button>
+                    ) : (
+                      <ProductMatchAction product={product} />
+                    )}
                     {product.images.length > 0 && (
                       <div className="flex h-16 w-16 items-center justify-center rounded-card bg-ivoire">
                         <Package className="h-8 w-8 text-gris-400" />
@@ -420,6 +439,12 @@ export default function ProductsPage() {
           </Button>
         </div>
       )}
+
+      <SyncOdooModal
+        product={syncProduct}
+        open={!!syncProduct}
+        onClose={() => setSyncProduct(null)}
+      />
     </div>
   );
 }
